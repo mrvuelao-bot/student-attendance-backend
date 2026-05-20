@@ -137,5 +137,6 @@ app.post('/api/checkin', (req, res) => {
     });
 });
 
-//  3. ແກ້ໄຂ: ລຶບ app.listen ໂຕເກົ່າທີ່ຢູ່ເຄິ່ງກາງໄຟລ໌ອອກ ແລ້ວໃຫ້ເຫຼືອແຕ່ໂຕລຸ່ມສຸດບ່ອນດຽວ
-app.listen(8000, () => console.log("🚀 Server running on http://127.0.0.1:8000"));
+//  3. ແກ້ໄຂ: ຕັ້ງພອດຈາກ env ເພື່ອໃຫ້ເຮືອນໃຊ້ໃນແວດລ້ອມການດັບພິເສດ (e.g., Vercel)
+const PORT = process.env.PORT || 8000;
+app.listen(PORT, () => console.log(`🚀 Server running on http://127.0.0.1:${PORT}`));
