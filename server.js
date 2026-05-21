@@ -9,14 +9,17 @@ app.use(cors());
 app.use(express.json());
 // ເພີ່ມສອງແຖວນີ້ໄວ້ກ່ອນການເຊື່ອມຕໍ່ DB
 console.log("Checking DB_HOST:", process.env.DB_HOST); 
-
+    
 const db = mysql.createConnection({
     host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
+    port: parseInt(process.env.DB_PORT) || 21137,
     user: process.env.DB_USER,
     password: process.env.DB_PASS,
     database: process.env.DB_NAME,
-    ssl: { rejectUnauthorized: false }
+    ssl: {
+        rejectUnauthorized: false
+    },
+    connectTimeout: 20000 // ເພີ່ມເວລາລໍຖ້າການເຊື່ອມຕໍ່ (20 ວິນາທີ)
 });
 
 // 2.  ເອີ້ນໃຊ້ db.connect ແຄ່ "ບ່ອນດຽວ" ເທົ່ານັ້ນໃນໄຟລ໌!
