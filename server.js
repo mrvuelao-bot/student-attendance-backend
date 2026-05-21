@@ -7,18 +7,16 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+// ເພີ່ມສອງແຖວນີ້ໄວ້ກ່ອນການເຊື່ອມຕໍ່ DB
+console.log("Checking DB_HOST:", process.env.DB_HOST); 
 
-// ປ່ຽນພາກສ່ວນການເຊື່ອມຕໍ່ DB ມາເປັນແບບນີ້:
 const db = mysql.createConnection({
     host: process.env.DB_HOST,
     port: process.env.DB_PORT,
     user: process.env.DB_USER,
     password: process.env.DB_PASS,
     database: process.env.DB_NAME,
-    timezone: '+07:00',
-    ssl: {
-        rejectUnauthorized: false
-    }
+    ssl: { rejectUnauthorized: false }
 });
 
 // 2.  ເອີ້ນໃຊ້ db.connect ແຄ່ "ບ່ອນດຽວ" ເທົ່ານັ້ນໃນໄຟລ໌!
