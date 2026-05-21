@@ -64,7 +64,10 @@ app.get('/api/attendance-list', async (req, res) => {
             return { ...u.toObject(), checkin_time: att ? att.checkin_time : null };
         });
         res.json(result);
-    } catch (err) { res.status(500).json({ message: err.message }); }
+    }  catch (err) { 
+    console.error("ລາຍລະອຽດ Error:", err); // ເບິ່ງໃນ Terminal ຂອງເຈົ້າ
+    res.status(500).json({ message: err.message }); // ສົ່ງ Error ແທ້ໆກັບມາໜ້າເວັບ
+}
 });
 
 app.post('/api/checkin', async (req, res) => {
