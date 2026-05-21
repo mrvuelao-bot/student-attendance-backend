@@ -1,10 +1,7 @@
-require('dotenv').config({ path: './.env' }); 
-
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-
-console.log("ກຳລັງເຊື່ອມຕໍ່ດ້ວຍ URI:", process.env.MONGO_URI ? "ພົບແລ້ວ!" : "ບໍ່ພົບ! ກະລຸນາກວດສອບໄຟລ໌ .env");
 
 const app = express();
 app.use(cors());
@@ -15,7 +12,7 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("✅ ເຊື່ອມຕໍ່ MongoDB ສຳເລັດ!"))
   .catch(err => console.error("❌ ເຊື່ອມຕໍ່ບໍ່ໄດ້:", err));
 
-// ສ້າງ Model
+// Models
 const User = mongoose.model('User', new mongoose.Schema({
     email: { type: String, unique: true, required: true },
     password: { type: String, required: true },
@@ -31,8 +28,8 @@ const Attendance = mongoose.model('Attendance', new mongoose.Schema({
 
 // API Routes
 app.post('/api/auth', async (req, res) => {
-    const { email, password, fullname, student_id } = req.body;
     try {
+        const { email, password, fullname, student_id } = req.body;
         let user = await User.findOne({ email });
         if (user) {
             res.json({ message: "ເຂົ້າລະບົບສຳເລັດ", user });
@@ -41,6 +38,7 @@ app.post('/api/auth', async (req, res) => {
             res.status(201).json({ message: "ລົງທະບຽນສຳເລັດ", user });
         }
     } catch (err) { 
+        console.error("Auth Error:", err);
         res.status(500).json({ message: err.message }); 
     }
 });
@@ -64,16 +62,13 @@ app.get('/api/attendance-list', async (req, res) => {
             return { ...u.toObject(), checkin_time: att ? att.checkin_time : null };
         });
         res.json(result);
-    }  catch (err) { 
-    console.error("ລາຍລະອຽດ Error:", err); // ເບິ່ງໃນ Terminal ຂອງເຈົ້າ
-    res.status(500).json({ message: err.message }); // ສົ່ງ Error ແທ້ໆກັບມາໜ້າເວັບ
-}
+    } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
 app.post('/api/checkin', async (req, res) => {
-    const { email } = req.body;
-    const today = new Date().toISOString().split('T')[0];
     try {
+        const { email } = req.body;
+        const today = new Date().toISOString().split('T')[0];
         const existing = await Attendance.findOne({ email, checkin_date: today });
         if (existing) return res.status(400).json({ message: "ເຈົ້າໄດ້ Check-in ໄປແລ້ວມື້ນີ້" });
         await Attendance.create({ email });
@@ -82,4 +77,4 @@ app.post('/api/checkin', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 8000;
-app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
