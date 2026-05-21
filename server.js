@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2'); //  1. ແກ້ໄຂ: ປ່ຽນມາໃຊ້ mysql2 ເພື່ອຮອງຮັບ MySQL 8.4 ເທິງ Cloud
 const cors = require('cors');
@@ -7,16 +8,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 1. ຕັ້ງຄ່າການເຊື່ອມຕໍ່ໄປຫາ Aiven Cloud MySQL
+// ປ່ຽນພາກສ່ວນການເຊື່ອມຕໍ່ DB ມາເປັນແບບນີ້:
 const db = mysql.createConnection({
-    host: "mysql-12bd3b50-mrvuelao-6013.e.aivencloud.com", 
-    port: 21137, 
-    user: "avnadmin", 
-    password: "AVNS_LXbIyI0stnNjQITiMMk", // ⚠️ ຢ່າລືມປ່ຽນລະຫັດແທ້ໃສ່ບ່ອນນີ້ເດີ້
-    database: "defaultdb", 
-    timezone: '+07:00', //  2. ເພີ່ມ: ບັງຄັບໃຫ້ໃຊ້ເວລາປະເທດລາວ ເພື່ອໃຫ້ CURDATE() Reset ຕົງເວລາທ່ຽງຄືນ
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASS,
+    database: process.env.DB_NAME,
+    timezone: '+07:00',
     ssl: {
-        rejectUnauthorized: false // ✅ ຈຳເປັນ: ຕ້ອງມີ SSL ສຳລັບການເຊື່ອມຕໍ່ MySQL Cloud
+        rejectUnauthorized: false
     }
 });
 
