@@ -1,24 +1,21 @@
-require('dotenv').config();
+require('dotenv').config({ path: './.env' }); 
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+
+console.log("ກຳລັງເຊື່ອມຕໍ່ດ້ວຍ URI:", process.env.MONGO_URI ? "ພົບແລ້ວ!" : "ບໍ່ພົບ! ກະລຸນາກວດສອບໄຟລ໌ .env");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 1. ເຊື່ອມຕໍ່ MongoDB
-const connectDB = async () => {
-    try {
-        await mongoose.connect(process.env.MONGO_URI);
-        console.log("✅ ເຊື່ອມຕໍ່ MongoDB ສຳເລັດ!");
-    } catch (err) {
-        console.error("❌ ເຊື່ອມຕໍ່ບໍ່ໄດ້:", err);
-    }
-};
-connectDB();
+// ເຊື່ອມຕໍ່ MongoDB
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("✅ ເຊື່ອມຕໍ່ MongoDB ສຳເລັດ!"))
+  .catch(err => console.error("❌ ເຊື່ອມຕໍ່ບໍ່ໄດ້:", err));
 
-// 2. ສ້າງ Model
+// ສ້າງ Model
 const User = mongoose.model('User', new mongoose.Schema({
     email: { type: String, unique: true, required: true },
     password: { type: String, required: true },
@@ -32,7 +29,7 @@ const Attendance = mongoose.model('Attendance', new mongoose.Schema({
     checkin_time: { type: String, default: () => new Date().toLocaleTimeString('en-GB') }
 }));
 
-// 3. API Routes
+// API Routes
 app.post('/api/auth', async (req, res) => {
     const { email, password, fullname, student_id } = req.body;
     try {
@@ -44,26 +41,17 @@ app.post('/api/auth', async (req, res) => {
             res.status(201).json({ message: "ລົງທະບຽນສຳເລັດ", user });
         }
     } catch (err) { 
-        console.error("Auth Error:", err);
         res.status(500).json({ message: err.message }); 
     }
 });
 
-// Route ໃໝ່ທີ່ StudentDashboard ຕ້ອງການ
 app.get('/api/attendance-summary', async (req, res) => {
     try {
         const users = await User.find();
         const today = new Date().toISOString().split('T')[0];
         const attendance = await Attendance.find({ checkin_date: today });
-        
-        res.json({ 
-            total: users.length, 
-            present: attendance.length, 
-            absent: users.length - attendance.length 
-        });
-    } catch (err) {
-        res.status(500).json({ message: "ດຶງຂໍ້ມູນ Summary ບໍ່ໄດ້" });
-    }
+        res.json({ total: users.length, present: attendance.length, absent: users.length - attendance.length });
+    } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
 app.get('/api/attendance-list', async (req, res) => {
@@ -71,13 +59,12 @@ app.get('/api/attendance-list', async (req, res) => {
         const users = await User.find();
         const today = new Date().toISOString().split('T')[0];
         const attendance = await Attendance.find({ checkin_date: today });
-        
         const result = users.map(u => {
             const att = attendance.find(a => a.email === u.email);
-            return { ...u.toObject(), checkin_time: att ? att.checkin_time : null, checkin_date: today };
+            return { ...u.toObject(), checkin_time: att ? att.checkin_time : null };
         });
         res.json(result);
-    } catch (err) { res.status(500).json({ message: "Error" }); }
+    } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
 app.post('/api/checkin', async (req, res) => {
@@ -86,10 +73,9 @@ app.post('/api/checkin', async (req, res) => {
     try {
         const existing = await Attendance.findOne({ email, checkin_date: today });
         if (existing) return res.status(400).json({ message: "ເຈົ້າໄດ້ Check-in ໄປແລ້ວມື້ນີ້" });
-
         await Attendance.create({ email });
         res.json({ message: "Check-in ສຳເລັດແລ້ວ!" });
-    } catch (err) { res.status(500).json({ message: "Check-in ບໍ່ສຳເລັດ" }); }
+    } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
 const PORT = process.env.PORT || 8000;
