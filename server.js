@@ -1,128 +1,69 @@
-require('dotenv').config(); // ຕ້ອງຢູ່ເທິງສຸດ
+require('dotenv').config();
 const express = require('express');
-const mysql = require('mysql2'); // ໃຊ້ mysql2 ເພື່ອຮອງຮັບ MySQL 8+
+const mongoose = require('mongoose');
 const cors = require('cors');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ຕັ້ງຄ່າການເຊື່ອມຕໍ່ Database
-const databaseUrl = process.env.DATABASE_URL || process.env.DB_URL;
-let dbHost = process.env.DB_HOST;
-let dbPort = process.env.DB_PORT || 21137;
-let dbName = process.env.DB_NAME;
-let dbUser = process.env.DB_USER;
-let dbPass = process.env.DB_PASS;
-let dbSslMode = process.env.DB_SSL_MODE || 'DISABLED';
+// 1. ເຊື່ອມຕໍ່ MongoDB
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("✅ ເຊື່ອມຕໍ່ MongoDB ສຳເລັດ!"))
+  .catch(err => console.error("❌ ເຊື່ອມຕໍ່ບໍ່ໄດ້:", err));
 
-if (databaseUrl) {
-    try {
-        const parsed = new URL(databaseUrl);
-        dbHost = parsed.hostname || dbHost;
-        dbPort = parsed.port || dbPort;
-        dbUser = parsed.username || dbUser;
-        dbPass = parsed.password || dbPass;
-        dbName = parsed.pathname?.slice(1) || dbName;
-        const sslParam = parsed.searchParams.get('ssl-mode');
-        if (sslParam) dbSslMode = sslParam.toUpperCase();
-    } catch (error) {
-        console.error('❌ Invalid DATABASE_URL:', error.message);
-    }
-}
+// 2. ສ້າງ Model (ຄືກັບການສ້າງ Table)
+const User = mongoose.model('User', new mongoose.Schema({
+    email: { type: String, unique: true, required: true },
+    password: { type: String, required: true },
+    fullname: String,
+    student_id: String
+}));
 
-console.log('⛓️ DB config:', {
-    host: dbHost,
-    port: dbPort,
-    database: dbName,
-    user: dbUser,
-    sslMode: dbSslMode,
-    urlUsed: Boolean(databaseUrl)
-});
+const Attendance = mongoose.model('Attendance', new mongoose.Schema({
+    email: String,
+    checkin_date: { type: String, default: () => new Date().toISOString().split('T')[0] },
+    checkin_time: { type: String, default: () => new Date().toLocaleTimeString('en-GB') }
+}));
 
-const dbOptions = {
-    host: dbHost,
-    port: dbPort,
-    user: dbUser,
-    password: dbPass,
-    database: dbName,
-    connectTimeout: 30000 // ເພີ່ມເວລາລໍຖ້າ 30 ວິນາທີ
-};
-
-if (dbSslMode.toUpperCase() === 'REQUIRED') {
-    dbOptions.ssl = { rejectUnauthorized: false };
-}
-
-const db = mysql.createConnection(dbOptions);
-
-// ເປີດການເຊື່ອມຕໍ່
-db.connect((err) => {
-    if (err) {
-        console.error("❌ DB Connection Error:", err.message);
-        return;
-    }
-    console.log("✅ Connected to MySQL Cloud (Aiven) Successfully!");
-    
-    // ສ້າງຕາຕະລາງ
-    const createUsersTable = `CREATE TABLE IF NOT EXISTS users (email VARCHAR(255) PRIMARY KEY, password VARCHAR(255) NOT NULL, fullname VARCHAR(255) NOT NULL, student_id VARCHAR(50) NOT NULL);`;
-    const createAttendanceTable = `CREATE TABLE IF NOT EXISTS attendance (id INT AUTO_INCREMENT PRIMARY KEY, email VARCHAR(255), checkin_date DATE, checkin_time TIME, FOREIGN KEY (email) REFERENCES users(email));`;
-
-    db.query(createUsersTable, (err) => { if (err) console.error("Error creating users table:", err); });
-    db.query(createAttendanceTable, (err) => { if (err) console.error("Error creating attendance table:", err); });
-});
-
-// API Routes
-app.post('/api/auth', (req, res) => {
+// 3. API Routes
+app.post('/api/auth', async (req, res) => {
     const { email, password, fullname, student_id } = req.body;
-    db.query("SELECT * FROM users WHERE email = ?", [email], (err, result) => {
-        if (err) return res.status(500).json({ message: "DB Error" });
-        if (result.length > 0) {
-            res.json({ message: "ເຂົ້າລະບົບສຳເລັດ", user: result[0] });
+    try {
+        let user = await User.findOne({ email });
+        if (user) {
+            res.json({ message: "ເຂົ້າລະບົບສຳເລັດ", user });
         } else {
-            db.query("INSERT INTO users (email, password, fullname, student_id) VALUES (?,?,?,?)", [email, password, fullname, student_id], (err) => {
-                if (err) return res.status(500).json({ message: "ລົງທະບຽນບໍ່ສຳເລັດ" });
-                res.status(201).json({ message: "ລົງທະບຽນສຳເລັດ" });
-            });
+            user = await User.create({ email, password, fullname, student_id });
+            res.status(201).json({ message: "ລົງທະບຽນສຳເລັດ", user });
         }
-    });
+    } catch (err) { res.status(500).json({ message: "DB Error" }); }
 });
 
-app.get('/api/attendance-list', (req, res) => {
-    const sql = `SELECT u.student_id, u.fullname, u.email, a.checkin_time, a.checkin_date FROM users u LEFT JOIN attendance a ON u.email = a.email AND a.checkin_date = CURDATE() ORDER BY u.student_id ASC`;
-    db.query(sql, (err, result) => {
-        if (err) return res.status(500).json({ message: "Error fetching list" });
+app.get('/api/attendance-list', async (req, res) => {
+    try {
+        const users = await User.find();
+        const today = new Date().toISOString().split('T')[0];
+        const attendance = await Attendance.find({ checkin_date: today });
+        
+        const result = users.map(u => {
+            const att = attendance.find(a => a.email === u.email);
+            return { ...u.toObject(), checkin_time: att ? att.checkin_time : null, checkin_date: today };
+        });
         res.json(result);
-    });
+    } catch (err) { res.status(500).json({ message: "Error" }); }
 });
 
-app.get('/api/attendance-summary', (req, res) => {
-    const summarySql = `SELECT
-        COUNT(u.email) AS total,
-        SUM(CASE WHEN a.email IS NOT NULL THEN 1 ELSE 0 END) AS present
-        FROM users u
-        LEFT JOIN attendance a ON u.email = a.email AND a.checkin_date = CURDATE()`;
-    db.query(summarySql, (err, result) => {
-        if (err) return res.status(500).json({ message: "Error fetching summary" });
-        const row = result[0] || { total: 0, present: 0 };
-        res.json({
-            total: row.total,
-            present: row.present || 0,
-            absent: row.total - (row.present || 0)
-        });
-    });
-});
-
-app.post('/api/checkin', (req, res) => {
+app.post('/api/checkin', async (req, res) => {
     const { email } = req.body;
-    db.query("SELECT * FROM attendance WHERE email = ? AND checkin_date = CURDATE()", [email], (err, result) => {
-        if (err) return res.status(500).json({ message: "DB Error" });
-        if (result.length > 0) return res.status(400).json({ message: "ເຈົ້າໄດ້ Check-in ໄປແລ້ວມື້ນີ້" });
+    const today = new Date().toISOString().split('T')[0];
+    try {
+        const existing = await Attendance.findOne({ email, checkin_date: today });
+        if (existing) return res.status(400).json({ message: "ເຈົ້າໄດ້ Check-in ໄປແລ້ວມື້ນີ້" });
 
-        db.query("INSERT INTO attendance (email, checkin_date, checkin_time) VALUES (?, CURDATE(), CURTIME())", [email], (err) => {
-            if (err) return res.status(500).json({ message: "Check-in ບໍ່ສຳເລັດ" });
-            res.json({ message: "Check-in ສຳເລັດແລ້ວ!" });
-        });
-    });
+        await Attendance.create({ email });
+        res.json({ message: "Check-in ສຳເລັດແລ້ວ!" });
+    } catch (err) { res.status(500).json({ message: "Check-in ບໍ່ສຳເລັດ" }); }
 });
 
 const PORT = process.env.PORT || 8000;
