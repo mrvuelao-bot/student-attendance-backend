@@ -8,11 +8,17 @@ app.use(cors());
 app.use(express.json());
 
 // 1. ເຊື່ອມຕໍ່ MongoDB
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ ເຊື່ອມຕໍ່ MongoDB ສຳເລັດ!"))
-  .catch(err => console.error("❌ ເຊື່ອມຕໍ່ບໍ່ໄດ້:", err));
+const connectDB = async () => {
+    try {
+        await mongoose.connect(process.env.MONGO_URI);
+        console.log("✅ ເຊື່ອມຕໍ່ MongoDB ສຳເລັດ!");
+    } catch (err) {
+        console.error("❌ ເຊື່ອມຕໍ່ບໍ່ໄດ້:", err);
+    }
+};
+connectDB();
 
-// 2. ສ້າງ Model (ຄືກັບການສ້າງ Table)
+// 2. ສ້າງ Model
 const User = mongoose.model('User', new mongoose.Schema({
     email: { type: String, unique: true, required: true },
     password: { type: String, required: true },
@@ -37,7 +43,27 @@ app.post('/api/auth', async (req, res) => {
             user = await User.create({ email, password, fullname, student_id });
             res.status(201).json({ message: "ລົງທະບຽນສຳເລັດ", user });
         }
-    } catch (err) { res.status(500).json({ message: "DB Error" }); }
+    } catch (err) { 
+        console.error("Auth Error:", err);
+        res.status(500).json({ message: err.message }); 
+    }
+});
+
+// Route ໃໝ່ທີ່ StudentDashboard ຕ້ອງການ
+app.get('/api/attendance-summary', async (req, res) => {
+    try {
+        const users = await User.find();
+        const today = new Date().toISOString().split('T')[0];
+        const attendance = await Attendance.find({ checkin_date: today });
+        
+        res.json({ 
+            total: users.length, 
+            present: attendance.length, 
+            absent: users.length - attendance.length 
+        });
+    } catch (err) {
+        res.status(500).json({ message: "ດຶງຂໍ້ມູນ Summary ບໍ່ໄດ້" });
+    }
 });
 
 app.get('/api/attendance-list', async (req, res) => {
