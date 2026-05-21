@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: 2itb-sas-backend
+    env: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    branch: main
+    envVars:
+      - key: DB_HOST
+        value: mysql-12bd3b50-mrvuelao-6013.e.aivencloud.com
+      - key: DB_PORT
+        value: "21137"
+      - key: DB_USER
+        value: avnadmin
+      - key: DB_PASS
+        value: "REPLACE_WITH_YOUR_AIVEN_PASSWORD"
+      - key: DB_NAME
+        value: defaultdb
+      - key: DB_SSL_MODE
+        value: REQUIRED
